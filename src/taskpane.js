@@ -7,7 +7,7 @@
 //     → Wordに赤字の変更履歴として残る
 
 // ▼▼▼ デプロイ後、自分のNetlifyサイトのURLに書き換えてください ▼▼▼
-const PROOFREAD_ENDPOINT = "https://YOUR-SITE-NAME.netlify.app/.netlify/functions/proofread";
+const PROOFREAD_ENDPOINT = "https://word-kouetsu.netlify.app/.netlify/functions/proofread";
 // ▲▲▲ 例: https://word-koetsu.netlify.app/.netlify/functions/proofread ▲▲▲
 
 Office.onReady((info) => {

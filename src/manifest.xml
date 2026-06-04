@@ -5,7 +5,7 @@
 
   ★ デプロイ後、以下2か所を自分のNetlifyサイトのURLに置き換えること:
      1) <Id> は一意のGUIDに（後述の手順参照）
-     2) すべての https://YOUR-SITE-NAME.netlify.app を実際のURLに
+     2) すべての https://word-kouetsu.netlify.app を実際のURLに
 -->
 <OfficeApp
   xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
@@ -15,7 +15,7 @@
   xsi:type="TaskPaneApp">
 
   <!-- ▼ 一意のGUIDに置き換える（重複不可）。下記コマンドで生成できる ▼ -->
-  <Id>00000000-0000-0000-0000-000000000000</Id>
+  <Id>2407ae02-b724-432d-a018-f6ed923a5622</Id>
   <Version>1.0.0.0</Version>
   <ProviderName>あなたの会社名</ProviderName>
   <DefaultLocale>ja-JP</DefaultLocale>
@@ -23,12 +23,12 @@
   <Description DefaultValue="誤字脱字を検出し、変更履歴として反映します。" />
 
   <!-- アドインのアイコン（任意の公開URLでも可） -->
-  <IconUrl DefaultValue="https://YOUR-SITE-NAME.netlify.app/assets/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="https://YOUR-SITE-NAME.netlify.app/assets/icon-80.png" />
+  <IconUrl DefaultValue="https://word-kouetsu.netlify.app/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://word-kouetsu.netlify.app/assets/icon-80.png" />
 
   <!-- このアドインが通信する先のドメイン（許可リスト） -->
   <AppDomains>
-    <AppDomain>https://YOUR-SITE-NAME.netlify.app</AppDomain>
+    <AppDomain>https://word-kouetsu.netlify.app</AppDomain>
   </AppDomains>
 
   <Hosts>
@@ -36,7 +36,7 @@
   </Hosts>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://YOUR-SITE-NAME.netlify.app/taskpane.html" />
+    <SourceLocation DefaultValue="https://word-kouetsu.netlify.app/taskpane.html" />
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -86,13 +86,13 @@
 
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16" DefaultValue="https://YOUR-SITE-NAME.netlify.app/assets/icon-32.png" />
-        <bt:Image id="Icon.32" DefaultValue="https://YOUR-SITE-NAME.netlify.app/assets/icon-32.png" />
-        <bt:Image id="Icon.80" DefaultValue="https://YOUR-SITE-NAME.netlify.app/assets/icon-80.png" />
+        <bt:Image id="Icon.16" DefaultValue="https://word-kouetsu.netlify.app/assets/icon-32.png" />
+        <bt:Image id="Icon.32" DefaultValue="https://word-kouetsu.netlify.app/assets/icon-32.png" />
+        <bt:Image id="Icon.80" DefaultValue="https://word-kouetsu.netlify.app/assets/icon-80.png" />
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://YOUR-SITE-NAME.netlify.app/taskpane.html" />
-        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://YOUR-SITE-NAME.netlify.app/taskpane.html" />
+        <bt:Url id="Taskpane.Url" DefaultValue="https://word-kouetsu.netlify.app/taskpane.html" />
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://word-kouetsu.netlify.app/taskpane.html" />
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="日本語校閲を導入しました" />
