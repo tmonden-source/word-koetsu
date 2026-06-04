@@ -1,10 +1,18 @@
 // netlify/functions/predict-budget.js
-// Excelアドインから実績家計表データを受け取り、Claude APIで
-// 「認可後1か月分の予測家計表」を算出してJSONで返す中継サーバー。
+// Excelアドインから「実績家計表データ」と「予測家計表ひな形の費目リスト」を受け取り、
+// ひな形の各費目に当てはめる金額（と要確認注記）をClaude APIで算出して返す。
 //
-// 入力: { actuals: [{month, income:[{item,amount}], expense:[{item,amount}]}...],
-//         repayment: 33703 }   ← 再生計画に基づく返済額（パネルで手入力）
-// 出力: { income:[{item,amount,note}], expense:[{item,amount,note}], notes:[...] }
+// 入力: {
+//   actuals: [{month, income:[{item,amount}], expense:[{item,amount}]}...],
+//   templateIncomeItems: ["給与(申立人)", ...],   // ひな形のA列費目
+//   templateExpenseItems: ["住居費...", "食費", ...], // ひな形のC列費目
+//   repayment: 33703
+// }
+// 出力: {
+//   incomeAmounts: { "給与(申立人)": 246900, ... },
+//   expenseAmounts: { "食費": 120000, ... },
+//   reviewItems: [ { item, where, note } ]
+// }
 
 export default async (request) => {
   const corsHeaders = {
@@ -14,69 +22,57 @@ export default async (request) => {
     "Content-Type": "application/json",
   };
 
-  if (request.method === "OPTIONS") {
-    return new Response("", { status: 204, headers: corsHeaders });
-  }
-  if (request.method !== "POST") {
-    return new Response(JSON.stringify({ error: "POSTのみ対応しています" }), { status: 405, headers: corsHeaders });
-  }
+  if (request.method === "OPTIONS") return new Response("", { status: 204, headers: corsHeaders });
+  if (request.method !== "POST") return new Response(JSON.stringify({ error: "POSTのみ対応しています" }), { status: 405, headers: corsHeaders });
 
   try {
-    const { actuals, repayment } = await request.json();
+    const { actuals, templateIncomeItems, templateExpenseItems, repayment } = await request.json();
 
     if (!actuals || !Array.isArray(actuals) || actuals.length === 0) {
       return new Response(JSON.stringify({ error: "実績家計表のデータがありません" }), { status: 400, headers: corsHeaders });
     }
+    if (!Array.isArray(templateIncomeItems) || !Array.isArray(templateExpenseItems)) {
+      return new Response(JSON.stringify({ error: "ひな形の費目リストがありません" }), { status: 400, headers: corsHeaders });
+    }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: "サーバー側でAPIキーが設定されていません" }), { status: 500, headers: corsHeaders });
-    }
+    if (!apiKey) return new Response(JSON.stringify({ error: "サーバー側でAPIキーが設定されていません" }), { status: 500, headers: corsHeaders });
 
     const repaymentNum = Number(repayment) || 0;
 
     const systemPrompt =
-`あなたは日本の小規模個人再生事件を扱う法律事務所の事務職員を補助するアシスタントです。
-再生債務者の「申立前の家計実績（複数月）」をもとに、再生計画認可後の通常月（ボーナス月を除く）に
-予測される家計収支表を1か月分作成します。以下のルールを厳格に守ってください。
-
-【基本方針】
-- 各収入・支出項目は、与えられた実績の傾向（平均、季節変動、明らかな一時的支出の除外）を踏まえ、
-  認可後の通常月として妥当な概算額を算出する。
-- 1円単位の細かさは不要。実態に即した概算でよい。
-- 一時的・特殊な支出（例：申立てに伴う弁護士費用、引越し費用など、認可後は発生しない費目）は
-  予測には計上しない。
-
-【認可後に必ず反映する調整】
-- 「再生計画に基づく返済」を支出に必ず1行加える。金額は ${repaymentNum} 円。
-  （0 の場合も項目だけは「再生計画に基づく返済」を金額未記入で残す）
-
-【支出項目から推定される、計上漏れの定期支出を補う（重要）】
-実績の支出項目から、以下のような「所有・契約が推定されるのに、定期的な関連支出が
-予測表に無い」ものを検出し、概算を仮入力したうえで必ず note に「要確認」と記載する。
-- ガソリン代・駐車場代がある → 自動車を所有 → 「自動車税」「車検代（2年に1度を月割等）」
-  「自動車保険」がなければ補う
-- 住宅ローンがある → 持ち家 → 「固定資産税」「火災保険」がなければ補う
-- ペット関連費がある → 「ペット保険」「予防接種代」などの定期費を確認
-これらの補完項目は、金額を実勢相場の概算で仮入力しつつ、必ず note に「要確認：実額を確認してください」と書く。
-金額が全く推定できないものは amount を null にし、note に「要確認」と書く。
-
-【出力形式】
-必ず次のJSONのみを出力。前後の説明やMarkdownコードフェンスは一切付けない。
-{
-  "income": [{"item":"費目名","amount":数値またはnull,"note":""}],
-  "expense": [{"item":"費目名","amount":数値またはnull,"note":""}],
-  "notes": ["全体に関する補足があれば短く"]
-}
-noteは通常は空文字。補完・要確認項目にのみ「要確認：…」を記載する。
-費目名は実績家計表で使われている表記に合わせる。`;
+"あなたは日本の小規模個人再生事件を扱う法律事務所の事務職員を補助するアシスタントです。" +
+"再生債務者の申立前の家計実績（複数月）をもとに、福岡地裁の法定様式である予測家計表（ひな形）の" +
+"各費目に当てはめる金額を1か月分（ボーナス月を除く通常月）算出します。\n\n" +
+"【最重要・様式の制約】\n" +
+"- 出力できる費目は、後述する『ひな形の費目リスト』に載っているものだけです。新しい費目名を作ってはいけません。\n" +
+"- リストの費目名は一字一句そのまま使ってください（金額の対応キーになります）。\n\n" +
+"【金額算出の方針】\n" +
+"- 各費目は実績の傾向（平均・季節変動）から認可後の通常月として妥当な概算額を出す。1円単位は不要。\n" +
+"- 申立てに伴う弁護士費用など、認可後に発生しない一時的支出は計上しない。\n" +
+"- 実績に無い費目には金額を割り当てない（空欄のまま）。ただし下記の計上漏れ補完を除く。\n\n" +
+"【再生計画に基づく返済】\n" +
+"- ひな形に『再生計画に基づく返済』費目があれば、そこに " + repaymentNum + " 円を割り当てる（0なら割り当てない）。\n\n" +
+"【計上漏れの定期支出の補完（要確認として扱う）】\n" +
+"実績の支出から所有・契約が推定されるのに、対応する定期支出費目がひな形にあって実績に無い場合、" +
+"概算を割り当てたうえで必ず reviewItems に記録する：\n" +
+"- ガソリン代/駐車場代がある→自動車所有→『自動車税』『自動車保険』等の費目があれば概算を入れる\n" +
+"- 住宅ローンがある→持ち家→『固定資産税』『火災保険』等の費目があれば概算を入れる\n" +
+"これらは expenseAmounts に概算を入れつつ、reviewItems に {item:費目名, where:'expense', note:'要確認：実額を確認してください'} を必ず追加する。\n" +
+"推定根拠があるが金額が読めない場合は金額を入れず reviewItems にのみ記録する。\n\n" +
+"【出力形式】必ず次のJSONのみ。説明やコードフェンスは付けない。\n" +
+'{"incomeAmounts":{"費目名":数値},"expenseAmounts":{"費目名":数値},"reviewItems":[{"item":"費目名","where":"income|expense","note":"要確認：..."}]}\n' +
+"金額を割り当てない費目はキー自体を含めない。";
 
     const userContent =
-`以下が再生債務者の家計実績です（JSON）。これをもとに認可後の予測家計表を作成してください。
-
-${JSON.stringify(actuals, null, 2)}
-
-再生計画に基づく月々の返済額: ${repaymentNum} 円`;
+"【ひな形の収入費目リスト】（この中の費目名のみ使用可）\n" +
+JSON.stringify(templateIncomeItems, null, 2) + "\n\n" +
+"【ひな形の支出費目リスト】（この中の費目名のみ使用可）\n" +
+JSON.stringify(templateExpenseItems, null, 2) + "\n\n" +
+"【家計実績（複数月）】\n" +
+JSON.stringify(actuals, null, 2) + "\n\n" +
+"【再生計画に基づく月々の返済額】" + repaymentNum + " 円\n\n" +
+"上記をもとに、ひな形の費目に当てはめる金額をJSONで出力してください。";
 
     const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -111,9 +107,9 @@ ${JSON.stringify(actuals, null, 2)}
 
     return new Response(
       JSON.stringify({
-        income: Array.isArray(parsed.income) ? parsed.income : [],
-        expense: Array.isArray(parsed.expense) ? parsed.expense : [],
-        notes: Array.isArray(parsed.notes) ? parsed.notes : [],
+        incomeAmounts: parsed.incomeAmounts && typeof parsed.incomeAmounts === "object" ? parsed.incomeAmounts : {},
+        expenseAmounts: parsed.expenseAmounts && typeof parsed.expenseAmounts === "object" ? parsed.expenseAmounts : {},
+        reviewItems: Array.isArray(parsed.reviewItems) ? parsed.reviewItems : [],
       }),
       { status: 200, headers: corsHeaders }
     );
