@@ -1,0 +1,20 @@
+{
+  "name": "word-koetsu",
+  "version": "1.0.0",
+  "description": "Word文書の誤字脱字をClaude APIで校閲し、変更履歴として反映するOfficeアドイン（Netlify中継）",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "netlify dev",
+    "deploy": "netlify deploy --prod"
+  },
+  "keywords": [
+    "word",
+    "office-addin",
+    "netlify",
+    "claude",
+    "proofreading",
+    "japanese"
+  ],
+  "license": "MIT"
+}

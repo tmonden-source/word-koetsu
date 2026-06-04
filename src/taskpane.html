@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>日本語校閲</title>
+  <!-- Office.js（Wordと連携するための公式ライブラリ） -->
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <style>
+    :root {
+      --ink: #1a1714;
+      --paper: #faf7f2;
+      --accent: #b4452f;
+      --accent-soft: #e8d5c4;
+      --line: #d6cdbf;
+      --ok: #3a6b4f;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Hiragino Mincho ProN", "Yu Mincho", serif;
+      background: var(--paper);
+      color: var(--ink);
+      padding: 18px 16px 28px;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    .masthead {
+      border-bottom: 2px solid var(--ink);
+      padding-bottom: 10px;
+      margin-bottom: 4px;
+    }
+    .masthead h1 {
+      font-size: 19px;
+      letter-spacing: 0.18em;
+      font-weight: 600;
+    }
+    .masthead .sub {
+      font-family: "Yu Gothic", sans-serif;
+      font-size: 10px;
+      letter-spacing: 0.3em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-top: 3px;
+    }
+    .desc {
+      font-family: "Yu Gothic", sans-serif;
+      font-size: 11.5px;
+      color: #6b6157;
+      margin: 14px 0 18px;
+      line-height: 1.6;
+    }
+    button {
+      font-family: "Yu Gothic", sans-serif;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease;
+    }
+    .run-btn {
+      width: 100%;
+      background: var(--ink);
+      color: var(--paper);
+      padding: 13px;
+      font-size: 14px;
+      letter-spacing: 0.2em;
+      border-radius: 2px;
+    }
+    .run-btn:hover:not(:disabled) { background: var(--accent); }
+    .run-btn:disabled { opacity: 0.45; cursor: default; }
+    .status {
+      font-family: "Yu Gothic", sans-serif;
+      font-size: 11.5px;
+      margin: 16px 0;
+      min-height: 18px;
+      color: #6b6157;
+    }
+    .status.err { color: var(--accent); }
+    .status.ok { color: var(--ok); }
+    .count {
+      font-family: "Yu Gothic", sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      color: var(--accent);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      padding: 8px 0;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .count.show { display: block; }
+    .item {
+      border-left: 3px solid var(--accent-soft);
+      padding: 9px 12px;
+      margin-bottom: 9px;
+      background: #fff;
+    }
+    .item .pair {
+      font-size: 13.5px;
+      display: flex;
+      align-items: baseline;
+      gap: 7px;
+      flex-wrap: wrap;
+    }
+    .item .before {
+      color: #999;
+      text-decoration: line-through;
+    }
+    .item .arrow { color: var(--accent); font-size: 11px; }
+    .item .after { color: var(--ink); font-weight: 600; }
+    .item .reason {
+      font-family: "Yu Gothic", sans-serif;
+      font-size: 10.5px;
+      color: #8a8076;
+      margin-top: 4px;
+    }
+    .spinner {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border: 2px solid var(--accent-soft);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="masthead">
+    <h1>日本語校閲</h1>
+    <div class="sub">Proofreading Assistant</div>
+  </div>
+
+  <p class="desc">
+    文書全体の誤字・脱字・誤変換を検出し、<strong>変更履歴</strong>として反映します。
+    反映後はWordの「校閲」タブから個別に承諾・元に戻すことができます。
+  </p>
+
+  <button id="run" class="run-btn">校 閲 を 実 行</button>
+
+  <div id="status" class="status"></div>
+  <div id="count" class="count"></div>
+  <div id="results"></div>
+
+  <script src="taskpane.js"></script>
+</body>
+</html>

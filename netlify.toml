@@ -1,0 +1,11 @@
+# netlify.toml — Netlifyのビルド/配信設定
+
+[build]
+  # アドインの静的ファイル（manifest, HTML, JS）を置くフォルダ
+  publish = "src"
+  # サーバーレス関数の置き場所
+  functions = "netlify/functions"
+
+[functions]
+  # Node.js のランタイムを ES Module として扱う
+  node_bundler = "esbuild"
