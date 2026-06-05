@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  manifest-excel.xml — Excel用「予測家計表」アドインの設定ファイル。
+  配布時はこのファイルを各PCのExcelに読み込ませる（Word版とは別ファイル）。
+  GUIDはWord版と別の一意の値を使用済み。
+-->
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+
+  <Id>0c0d1976-9846-4fc4-a345-23f85bf0f075</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>ネクスパートオフィス福岡</ProviderName>
+  <DefaultLocale>ja-JP</DefaultLocale>
+  <DisplayName DefaultValue="予測家計表の作成" />
+  <Description DefaultValue="実績の家計表から、再生計画認可後の予測家計表を作成します。" />
+
+  <IconUrl DefaultValue="https://word-kouetsu.netlify.app/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://word-kouetsu.netlify.app/assets/icon-80.png" />
+
+  <AppDomains>
+    <AppDomain>https://word-kouetsu.netlify.app</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Workbook" />
+  </Hosts>
+
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://word-kouetsu.netlify.app/predict.html" />
+  </DefaultSettings>
+
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Workbook">
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="GetStarted.Title" />
+            <Description resid="GetStarted.Description" />
+            <LearnMoreUrl resid="GetStarted.LearnMoreUrl" />
+          </GetStarted>
+
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="YosokuGroup">
+                <Label resid="Group.Label" />
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16" />
+                  <bt:Image size="32" resid="Icon.32" />
+                  <bt:Image size="80" resid="Icon.80" />
+                </Icon>
+                <Control xsi:type="Button" id="OpenPredictButton">
+                  <Label resid="Button.Label" />
+                  <Supertip>
+                    <Title resid="Button.Label" />
+                    <Description resid="Button.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16" />
+                    <bt:Image size="32" resid="Icon.32" />
+                    <bt:Image size="80" resid="Icon.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>YosokuTaskpane</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16" DefaultValue="https://word-kouetsu.netlify.app/assets/icon-32.png" />
+        <bt:Image id="Icon.32" DefaultValue="https://word-kouetsu.netlify.app/assets/icon-32.png" />
+        <bt:Image id="Icon.80" DefaultValue="https://word-kouetsu.netlify.app/assets/icon-80.png" />
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://word-kouetsu.netlify.app/predict.html" />
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://word-kouetsu.netlify.app/predict.html" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title" DefaultValue="予測家計表アドインを導入しました" />
+        <bt:String id="Group.Label" DefaultValue="家計表" />
+        <bt:String id="Button.Label" DefaultValue="予測家計表" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="GetStarted.Description" DefaultValue="「家計表」グループの「予測家計表」ボタンから開始できます。" />
+        <bt:String id="Button.Tooltip" DefaultValue="実績から認可後の予測家計表を作成します。" />
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>
