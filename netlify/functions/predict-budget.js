@@ -1,17 +1,19 @@
 // netlify/functions/predict-budget.js
 // Excelアドインから「実績家計表データ」と「予測家計表ひな形の費目リスト」を受け取り、
-// ひな形の各費目に当てはめる金額（と要確認注記）をClaude APIで算出して返す。
+// (1) ひな形の既存費目に当てはめる金額、(2) ひな形に無い実績費目の追記分、をClaude APIで算出して返す。
 //
 // 入力: {
 //   actuals: [{month, income:[{item,amount}], expense:[{item,amount}]}...],
-//   templateIncomeItems: ["給与(申立人)", ...],   // ひな形のA列費目
-//   templateExpenseItems: ["住居費...", "食費", ...], // ひな形のC列費目
-//   repayment: 33703
+//   templateIncomeItems: [...], templateExpenseItems: [...],
+//   incomeBlankCount, expenseBlankCount,   // 追記できる空白行の数
+//   repayment
 // }
 // 出力: {
-//   incomeAmounts: { "給与(申立人)": 246900, ... },
-//   expenseAmounts: { "食費": 120000, ... },
-//   reviewItems: [ { item, where, note } ]
+//   incomeAmounts: { 費目名: 金額 },         // 既存費目への割当
+//   expenseAmounts: { 費目名: 金額 },
+//   incomeAdditions: [ {item, amount, note} ], // ひな形に無い→空白行へ追記
+//   expenseAdditions: [ {item, amount, note} ],
+//   reviewItems: [ {item, where, note} ]
 // }
 
 export default async (request) => {
@@ -26,7 +28,10 @@ export default async (request) => {
   if (request.method !== "POST") return new Response(JSON.stringify({ error: "POSTのみ対応しています" }), { status: 405, headers: corsHeaders });
 
   try {
-    const { actuals, templateIncomeItems, templateExpenseItems, repayment } = await request.json();
+    const body = await request.json();
+    const { actuals, templateIncomeItems, templateExpenseItems, repayment } = body;
+    const incomeBlankCount = Number(body.incomeBlankCount) || 0;
+    const expenseBlankCount = Number(body.expenseBlankCount) || 0;
 
     if (!actuals || !Array.isArray(actuals) || actuals.length === 0) {
       return new Response(JSON.stringify({ error: "実績家計表のデータがありません" }), { status: 400, headers: corsHeaders });
@@ -42,37 +47,41 @@ export default async (request) => {
 
     const systemPrompt =
 "あなたは日本の小規模個人再生事件を扱う法律事務所の事務職員を補助するアシスタントです。" +
-"再生債務者の申立前の家計実績（複数月）をもとに、福岡地裁の法定様式である予測家計表（ひな形）の" +
-"各費目に当てはめる金額を1か月分（ボーナス月を除く通常月）算出します。\n\n" +
-"【最重要・様式の制約】\n" +
-"- 出力できる費目は、後述する『ひな形の費目リスト』に載っているものだけです。新しい費目名を作ってはいけません。\n" +
-"- リストの費目名は一字一句そのまま使ってください（金額の対応キーになります）。\n\n" +
-"【金額算出の方針】\n" +
-"- 各費目は実績の傾向（平均・季節変動）から認可後の通常月として妥当な概算額を出す。1円単位は不要。\n" +
-"- 申立てに伴う弁護士費用など、認可後に発生しない一時的支出は計上しない。\n" +
-"- 実績に無い費目には金額を割り当てない（空欄のまま）。ただし下記の計上漏れ補完を除く。\n\n" +
-"【再生計画に基づく返済】\n" +
-"- ひな形に『再生計画に基づく返済』費目があれば、そこに " + repaymentNum + " 円を割り当てる（0なら割り当てない）。\n\n" +
-"【計上漏れの定期支出の補完（要確認として扱う）】\n" +
-"実績の支出から所有・契約が推定されるのに、対応する定期支出費目がひな形にあって実績に無い場合、" +
-"概算を割り当てたうえで必ず reviewItems に記録する：\n" +
-"- ガソリン代/駐車場代がある→自動車所有→『自動車税』『自動車保険』等の費目があれば概算を入れる\n" +
-"- 住宅ローンがある→持ち家→『固定資産税』『火災保険』等の費目があれば概算を入れる\n" +
-"これらは expenseAmounts に概算を入れつつ、reviewItems に {item:費目名, where:'expense', note:'要確認：実額を確認してください'} を必ず追加する。\n" +
-"推定根拠があるが金額が読めない場合は金額を入れず reviewItems にのみ記録する。\n\n" +
+"再生債務者の申立前の家計実績（複数月）をもとに、福岡地裁の法定様式である予測家計表（ひな形）を" +
+"1か月分（ボーナス月を除く通常月）作成します。\n\n" +
+"【出力は2系統に分ける】\n" +
+"(A) ひな形に既にある費目への金額割当 … incomeAmounts / expenseAmounts\n" +
+"(B) ひな形に無いが実績にあった費目の追記 … incomeAdditions / expenseAdditions\n\n" +
+"【(A) 既存費目への割当】\n" +
+"- キーは『ひな形の費目リスト』の費目名を一字一句そのまま使う（新費目を作らない）。\n" +
+"- 実績の傾向（平均・季節変動）から認可後の通常月として妥当な概算額を出す。1円単位は不要。\n" +
+"- 実績に無い費目には割り当てない（キーを含めない）。ただし下記の計上漏れ補完を除く。\n" +
+"- ひな形に『再生計画に基づく返済』があれば " + repaymentNum + " 円を割り当てる（0なら割り当てない）。\n\n" +
+"【(B) ひな形に無い実績費目の追記（重要）】\n" +
+"- 実績の支出費目のうち、ひな形の支出費目リストに相当する費目が無いものは、認可後も継続する費目であれば" +
+" expenseAdditions に {item:実績の費目名, amount:概算, note:''} として出す。\n" +
+"- 同様に収入側は incomeAdditions に出す。\n" +
+"- ただし申立てに伴う弁護士費用など認可後に発生しない一時的費目は追記しない（除外する）。\n" +
+"- 追記できる空白行数の上限：収入 " + incomeBlankCount + " 行、支出 " + expenseBlankCount + " 行。" +
+"重要なものから順に、この行数を超えないように厳選する。超える場合は金額の大きい定期支出を優先。\n\n" +
+"【計上漏れの定期支出の補完（要確認）】\n" +
+"実績から所有・契約が推定されるのに対応する定期支出が無い場合、概算を入れて reviewItems に記録する：\n" +
+"- ガソリン代/駐車場代→自動車→『自動車税』『自動車保険』等。ひな形に費目があれば expenseAmounts、無ければ expenseAdditions に入れる。\n" +
+"- 住宅ローン→持ち家→『固定資産税』『火災保険』等。同上。\n" +
+"これらは必ず note に『要確認：実額を確認してください』と書き、reviewItems にも {item,where,note} を追加する。\n\n" +
 "【出力形式】必ず次のJSONのみ。説明やコードフェンスは付けない。\n" +
-'{"incomeAmounts":{"費目名":数値},"expenseAmounts":{"費目名":数値},"reviewItems":[{"item":"費目名","where":"income|expense","note":"要確認：..."}]}\n' +
-"金額を割り当てない費目はキー自体を含めない。";
+'{"incomeAmounts":{"費目名":数値},"expenseAmounts":{"費目名":数値},' +
+'"incomeAdditions":[{"item":"費目名","amount":数値,"note":""}],' +
+'"expenseAdditions":[{"item":"費目名","amount":数値,"note":""}],' +
+'"reviewItems":[{"item":"費目名","where":"income|expense","note":"要確認：..."}]}';
 
     const userContent =
-"【ひな形の収入費目リスト】（この中の費目名のみ使用可）\n" +
-JSON.stringify(templateIncomeItems, null, 2) + "\n\n" +
-"【ひな形の支出費目リスト】（この中の費目名のみ使用可）\n" +
-JSON.stringify(templateExpenseItems, null, 2) + "\n\n" +
-"【家計実績（複数月）】\n" +
-JSON.stringify(actuals, null, 2) + "\n\n" +
+"【ひな形の収入費目リスト】（(A)で使う費目名）\n" + JSON.stringify(templateIncomeItems, null, 2) + "\n\n" +
+"【ひな形の支出費目リスト】（(A)で使う費目名）\n" + JSON.stringify(templateExpenseItems, null, 2) + "\n\n" +
+"【追記できる空白行数】収入 " + incomeBlankCount + " 行 / 支出 " + expenseBlankCount + " 行\n\n" +
+"【家計実績（複数月）】\n" + JSON.stringify(actuals, null, 2) + "\n\n" +
 "【再生計画に基づく月々の返済額】" + repaymentNum + " 円\n\n" +
-"上記をもとに、ひな形の費目に当てはめる金額をJSONで出力してください。";
+"上記をもとにJSONを出力してください。実績にあってひな形に無い費目は追記分(B)に回してください。";
 
     const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -105,11 +114,16 @@ JSON.stringify(actuals, null, 2) + "\n\n" +
       return new Response(JSON.stringify({ error: "予測結果の解析に失敗しました", raw }), { status: 502, headers: corsHeaders });
     }
 
+    const arr = (x) => (Array.isArray(x) ? x : []);
+    const obj = (x) => (x && typeof x === "object" ? x : {});
+
     return new Response(
       JSON.stringify({
-        incomeAmounts: parsed.incomeAmounts && typeof parsed.incomeAmounts === "object" ? parsed.incomeAmounts : {},
-        expenseAmounts: parsed.expenseAmounts && typeof parsed.expenseAmounts === "object" ? parsed.expenseAmounts : {},
-        reviewItems: Array.isArray(parsed.reviewItems) ? parsed.reviewItems : [],
+        incomeAmounts: obj(parsed.incomeAmounts),
+        expenseAmounts: obj(parsed.expenseAmounts),
+        incomeAdditions: arr(parsed.incomeAdditions),
+        expenseAdditions: arr(parsed.expenseAdditions),
+        reviewItems: arr(parsed.reviewItems),
       }),
       { status: 200, headers: corsHeaders }
     );

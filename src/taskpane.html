@@ -123,6 +123,17 @@
       margin-right: 6px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .refs {
+      margin-top: 22px; padding-top: 14px;
+      border-top: 1px solid var(--line);
+      font-family: "Yu Gothic", sans-serif;
+    }
+    .refs-title { font-size: 10.5px; letter-spacing: .1em; color: var(--accent); margin-bottom: 6px; }
+    .refs a {
+      display: block; font-size: 11px; color: #5a635e;
+      text-decoration: none; padding: 2px 0;
+    }
+    .refs a:hover { color: var(--accent); text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -141,6 +152,14 @@
   <div id="status" class="status"></div>
   <div id="count" class="count"></div>
   <div id="results"></div>
+
+  <div class="refs">
+    <div class="refs-title">表記ルールの参考資料</div>
+    <a href="https://www.bunka.go.jp/kokugo_nihongo/sisaku/joho/joho/kijun/sanko/koyobun/" target="_blank" rel="noopener">文化庁「公用文作成の考え方」</a>
+    <a href="https://www.bunka.go.jp/kokugo_nihongo/sisaku/joho/joho/kakuki/14/tosin02/index.html" target="_blank" rel="noopener">文化庁「送り仮名の付け方」</a>
+    <a href="https://www5d.biglobe.ne.jp/Jusl/Bunsyo/Hyouki.html" target="_blank" rel="noopener">裁判文書の表記方法（参考）</a>
+    <a href="https://laws.e-gov.go.jp/" target="_blank" rel="noopener">e-Gov法令検索</a>
+  </div>
 
   <script src="taskpane.js"></script>
 </body>

@@ -106,46 +106,71 @@ async function readActual(context, name) {
   return { month: name, income, expense };
 }
 
-// ひな形シートを読み、費目→金額セル番地の対応を作る
+// ひな形シートを読み、費目→金額セル番地の対応と、空白の追記可能行を作る
 // 収入: A列に費目, 金額はB列同じ行 / 支出: C列に費目, 金額はD列同じ行
 async function readTemplate(context, name) {
   const ws = context.workbook.worksheets.getItem(name);
   const used = ws.getUsedRange();
-  used.load("values, rowIndex, columnIndex, formulas");
+  used.load("values, rowIndex, formulas");
   await context.sync();
 
   const baseRow = used.rowIndex; // 0始まり
   const values = used.values;
   const formulas = used.formulas;
 
-  const incomeMap = {};  // 費目名 -> セル番地(B列)
-  const expenseMap = {}; // 費目名 -> セル番地(D列)
+  const incomeMap = {};   // 費目名 -> セル番地(B列)
+  const expenseMap = {};  // 費目名 -> セル番地(D列)
   const incomeItems = [];
   const expenseItems = [];
+  const incomeBlankRows = [];  // 収入の追記可能行（A列空欄・B列が数式でない実行番号）
+  const expenseBlankRows = []; // 支出の追記可能行
 
+  // 明細行の終端 = 最初に合計行（B列/D列が数式）が現れる手前まで
+  let detailEndRow = baseRow + values.length; // 既定は最終行
   for (let i = 0; i < values.length; i++) {
-    const r = baseRow + i + 1; // Excelの実行番号(1始まり)
     const aItem = String(values[i][0] == null ? "" : values[i][0]).trim();
     const cItem = String(values[i][2] == null ? "" : values[i][2]).trim();
-
-    // 収入費目: B列が数式でない（合計行を除外）かつ費目名がある
-    if (aItem && !isStop(aItem)) {
-      const bFormula = String(formulas[i][1] == null ? "" : formulas[i][1]);
-      if (!bFormula.startsWith("=")) {
-        incomeMap[aItem] = "B" + r;
-        incomeItems.push(aItem);
-      }
-    }
-    // 支出費目: D列が数式でない
-    if (cItem && !isStop(cItem)) {
-      const dFormula = String(formulas[i][3] == null ? "" : formulas[i][3]);
-      if (!dFormula.startsWith("=")) {
-        expenseMap[cItem] = "D" + r;
-        expenseItems.push(cItem);
+    if (isStop(aItem) || isStop(cItem)) {
+      // 合計・繰越行に到達したらそこが明細の終わり
+      const bF = String(formulas[i][1] == null ? "" : formulas[i][1]);
+      const dF = String(formulas[i][3] == null ? "" : formulas[i][3]);
+      if ((isStop(aItem) || isStop(cItem)) && (bF.startsWith("=") || dF.startsWith("=") || /合計|繰越|総/.test(aItem + cItem))) {
+        detailEndRow = baseRow + i;
+        break;
       }
     }
   }
-  return { incomeMap, expenseMap, incomeItems, expenseItems };
+
+  for (let i = 0; i < values.length; i++) {
+    const r = baseRow + i + 1; // Excel実行番号(1始まり)
+    if (r > detailEndRow) break; // 明細行のみ対象（合計行以降は触らない）
+
+    const aItem = String(values[i][0] == null ? "" : values[i][0]).trim();
+    const cItem = String(values[i][2] == null ? "" : values[i][2]).trim();
+    const bFormula = String(formulas[i][1] == null ? "" : formulas[i][1]);
+    const dFormula = String(formulas[i][3] == null ? "" : formulas[i][3]);
+    const bIsFormula = bFormula.startsWith("=");
+    const dIsFormula = dFormula.startsWith("=");
+
+    // 収入側
+    if (aItem && !isStop(aItem) && !bIsFormula) {
+      incomeMap[aItem] = "B" + r;
+      incomeItems.push(aItem);
+    } else if (!aItem && !bIsFormula) {
+      // A列が空欄＝追記可能行（ただしB30:B31の結合下側など特殊行は避けるため後段でガード）
+      incomeBlankRows.push(r);
+    }
+
+    // 支出側
+    if (cItem && !isStop(cItem) && !dIsFormula) {
+      expenseMap[cItem] = "D" + r;
+      expenseItems.push(cItem);
+    } else if (!cItem && !dIsFormula) {
+      expenseBlankRows.push(r);
+    }
+  }
+
+  return { incomeMap, expenseMap, incomeItems, expenseItems, incomeBlankRows, expenseBlankRows };
 }
 
 async function runPredict() {
@@ -185,6 +210,8 @@ async function runPredict() {
         actuals,
         templateIncomeItems: template.incomeItems,
         templateExpenseItems: template.expenseItems,
+        incomeBlankCount: template.incomeBlankRows.length,
+        expenseBlankCount: template.expenseBlankRows.length,
         repayment,
       }),
     });
@@ -195,10 +222,11 @@ async function runPredict() {
     const prediction = await res.json();
 
     setStatus('<span class="spinner"></span>ひな形に金額を書き込んでいます…');
-    const count = await writeAmounts(templateName, template, prediction);
+    const { count, added } = await writeAmounts(templateName, template, prediction);
 
     renderReview(prediction);
-    setStatus("「" + templateName + "」に " + count + " 件の金額を書き込みました。様式は維持されています。「要確認」項目は実額をご確認ください。", "ok");
+    const addMsg = added > 0 ? `、実績独自の費目 ${added} 件を空白欄に追記しました` : "";
+    setStatus("「" + templateName + "」に既存費目 " + count + " 件の金額を書き込み" + addMsg + "。様式は維持されています。「要確認」項目は実額をご確認ください。", "ok");
   } catch (err) {
     setStatus("エラー: " + err.message, "err");
   } finally {
@@ -206,15 +234,17 @@ async function runPredict() {
   }
 }
 
-// ひな形の金額セルにだけ値を書き込む（書式・結合・数式は触らない）
+// ひな形の金額セルにだけ値を書き込む + ひな形に無い費目を空白行へ追記
 async function writeAmounts(templateName, template, prediction) {
   return await Excel.run(async (context) => {
     const ws = context.workbook.worksheets.getItem(templateName);
     let count = 0;
+    let added = 0;
 
     const inc = prediction.incomeAmounts || {};
     const exp = prediction.expenseAmounts || {};
 
+    // (A) 既存費目へ金額を割当
     for (const [item, addr] of Object.entries(template.incomeMap)) {
       if (item in inc && typeof inc[item] === "number") {
         ws.getRange(addr).values = [[inc[item]]];
@@ -228,9 +258,37 @@ async function writeAmounts(templateName, template, prediction) {
       }
     }
 
+    // (B) ひな形に無い実績費目を空白行へ追記（費目名＋金額）
+    const incAdd = prediction.incomeAdditions || [];
+    const expAdd = prediction.expenseAdditions || [];
+
+    // 収入: A列に費目, B列に金額
+    let iBlank = template.incomeBlankRows.slice();
+    for (const a of incAdd) {
+      if (iBlank.length === 0) break;
+      if (!a || !a.item) continue;
+      const r = iBlank.shift();
+      const label = a.note ? `${a.item}（${a.note}）` : a.item;
+      ws.getRange("A" + r).values = [[label]];
+      if (typeof a.amount === "number") ws.getRange("B" + r).values = [[a.amount]];
+      added++;
+    }
+
+    // 支出: C列に費目, D列に金額
+    let eBlank = template.expenseBlankRows.slice();
+    for (const a of expAdd) {
+      if (eBlank.length === 0) break;
+      if (!a || !a.item) continue;
+      const r = eBlank.shift();
+      const label = a.note ? `${a.item}（${a.note}）` : a.item;
+      ws.getRange("C" + r).values = [[label]];
+      if (typeof a.amount === "number") ws.getRange("D" + r).values = [[a.amount]];
+      added++;
+    }
+
     ws.activate();
     await context.sync();
-    return count;
+    return { count, added };
   });
 }
 
