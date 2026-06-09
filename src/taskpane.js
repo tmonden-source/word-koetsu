@@ -108,9 +108,18 @@ async function applyCorrections(corrections) {
 
       if (searchResults.items.length === 0) continue;
 
-      // 最初の1件のみ置換（同じ文字列の過剰な一括置換を避ける）
-      searchResults.items[0].insertText(c.after, Word.InsertLocation.replace);
-      appliedCount++;
+      // 数字の全角化・金額表記など機械的なルールは全件置換（表記を統一するため）。
+      // それ以外（文脈依存の修正）は最初の1件のみ置換し、過剰な一括置換を避ける。
+      const isMechanical = c.reason && (c.reason.indexOf("全角") !== -1 || c.reason.indexOf("金額") !== -1);
+      if (isMechanical) {
+        for (let i = 0; i < searchResults.items.length; i++) {
+          searchResults.items[i].insertText(c.after, Word.InsertLocation.replace);
+        }
+        appliedCount++;
+      } else {
+        searchResults.items[0].insertText(c.after, Word.InsertLocation.replace);
+        appliedCount++;
+      }
       await context.sync();
     }
 

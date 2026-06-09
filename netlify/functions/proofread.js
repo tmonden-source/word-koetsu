@@ -11,27 +11,61 @@ function _toHalf(s) {
 function _formatYen(n) {
   if (n < 10000) return _toFull(n) + "円";
   const oku = Math.floor(n / 100000000);
+  const manTotal = Math.floor(n / 10000); // 億・万をまとめた万単位
   const man = Math.floor((n % 100000000) / 10000);
   const rest = n % 10000;
   let out = "";
   if (oku > 0) {
     out += _toFull(oku) + "億";
-    out += _toFull(String(man).padStart(4, "0")) + "万";
-    out += _toFull(String(rest).padStart(4, "0"));
+    // 億がある場合、万の位は4桁ゼロ詰め（読み崩れ防止）
+    if (man > 0 || rest > 0) out += _toFull(String(man).padStart(4, "0")) + "万";
+    // 端数があるときだけ4桁ゼロ詰めの末尾を付ける。端数0なら付けない（○億○○○○万円ちょうど）
+    if (rest > 0) out += _toFull(String(rest).padStart(4, "0"));
   } else {
     out += _toFull(man) + "万";
-    out += _toFull(String(rest).padStart(4, "0"));
+    // 端数があるときだけ4桁ゼロ詰め。端数0なら『○○万円』のままにする
+    if (rest > 0) out += _toFull(String(rest).padStart(4, "0"));
   }
   return out + "円";
 }
-// テキストから金額表現を拾い、裁判文書形式と異なるものを {before, after, reason} で返す
+// テキスト中の半角数字（連続した数字のまとまり）を全角に直す候補を返す。
+// 金額表現の位置（範囲）を渡し、その範囲に重なる数字は金額側に任せてスキップする。
+function detectFullwidthDigitIssues(text, moneyRanges) {
+  const issues = [];
+  const seen = new Set();
+  const re = /[0-9]+(?:[.,][0-9]+)*/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const orig = m[0];
+    const start = m.index;
+    const end = start + orig.length;
+    // この数字の位置が、いずれかの金額表現の範囲と重なるならスキップ
+    let overlap = false;
+    for (const r of moneyRanges) {
+      if (start < r.end && end > r.start) { overlap = true; break; }
+    }
+    if (overlap) continue;
+    if (seen.has(orig)) continue;
+    const full = _toFull(orig);
+    if (orig !== full) {
+      issues.push({ before: orig, after: full, reason: "数字は全角に統一" });
+      seen.add(orig);
+    }
+  }
+  return issues;
+}
+
+// テキストから金額表現を拾い、裁判文書形式と異なるものを {before, after, reason} で返す。
+// あわせて各金額表現の出現位置（range）も返し、数字の全角化と二重処理しないようにする。
 function detectMoneyIssues(text) {
   const issues = [];
+  const ranges = [];
   const seen = new Set();
   const re = /([0-9０-９][0-9０-９,，億万千百十]*円)/g;
   let m;
   while ((m = re.exec(text)) !== null) {
     const orig = m[1];
+    ranges.push({ start: m.index, end: m.index + orig.length });
     if (seen.has(orig)) continue;
     const half = _toHalf(orig).replace(/[,，]/g, "");
     const mm = half.match(/^(?:(\d+)億)?(?:(\d+)万)?(\d+)?円$/);
@@ -47,7 +81,7 @@ function detectMoneyIssues(text) {
       seen.add(orig);
     }
   }
-  return issues;
+  return { issues, ranges };
 }
 
 // Wordアドインから本文を受け取り、Claude APIで日本語校閲を行い、
@@ -150,12 +184,13 @@ export default async (request) => {
       "【裁判文書の表記ルールも適用する】\n" +
       "10) 句読点は、読点に『、』（テン）、句点に『。』（マル）を用いる。読点に『，』（コンマ）、" +
       "句点に『．』（ピリオド）が使われていれば『、』『。』に修正する（令和4年以降、裁判文書・公用文の読点はテンを基本とする）。\n" +
-      "11) 金額は裁判文書の慣行に従い『○○万○○○○円』の形式で、全角数字を用い、コンマ（，）は付けない。" +
-      "『万』『億』の後ろは千・百・十・一の位を必ず4桁にそろえ、空位は0で埋める。" +
-      "正しい例：『５４７万０３２０円』（誤り：547万320円、547万5320円、5,470,320円、5,475,320円）。" +
-      "『１００万００００円』のように端数が0でも4桁にそろえる。" +
-      "（注：この金額形式はサーバー側でも自動的に検出・修正される。）\n" +
-      "12) 金額以外の数字も原則として算用数字を用いる。『1名』『2名』のように書く。\n" +
+      "11) 金額は裁判文書の慣行に従い全角数字を用い、コンマ（，）は付けない。" +
+      "端数がある場合は『○○万○○○○円』の形式で『万』『億』の後ろを4桁ゼロ詰めにする" +
+      "（例：５４７万０３２０円。誤り：547万320円、5,470,320円）。" +
+      "ただし端数のない切りのよい金額は『１３０万円』『１００万円』のようにそのまま書き、無理に『１３０万００００円』としない。" +
+      "（注：金額形式と全角化はサーバー側でも自動的に検出・修正される。）\n" +
+      "12) 文章中の数字は全て全角に統一する（半角数字があれば全角に直す）。" +
+      "『1名』→『１名』、『令和6年』→『令和６年』など。（サーバー側でも自動的に全角へ統一する。）\n" +
       "13) 日時は『午後3時15分』のように書く。\n" +
       "14) 法令の条文番号は、条に『第』を付けず『民法94条2項』のように書く。" +
       "ただし枝番号が付く場合は『民法94条の2第2項』のように『第』を用いる。\n" +
@@ -167,6 +202,12 @@ export default async (request) => {
       "上記に反する表記・不明確な箇所があれば修正対象とし、reason に該当ルール名（『公用文の送り仮名規則』" +
       "『裁判文書の句読点』『法令条文の表記』『主語の補充』等）を簡潔に記す。\n" +
       "なお、文章全体の段落再構成や大幅な書き換えは行わず、語句・文単位の表記是正と必要最小限の主述補充にとどめる。\n" +
+      "【判断の分かれる語の統一方針（毎回同じ判断をすること）】\n" +
+      "次の語は迷いやすいが、必ず以下に統一する：\n" +
+      "・『かかる/係る』…『○○に係る○○』（〜に関する意）は法令・公用文で漢字『係る』に統一する。" +
+      "（連体詞『かかる事態』等は別で、これは仮名のまま。）\n" +
+      "・判断が本質的に分かれ、どちらでも正しい表記は、原則として原文を維持し、無理に変更しない。\n" +
+      "（重要：確実な誤り・明確なルール違反のみを修正し、好みの問題に踏み込まないことで、毎回の結果を安定させる。）\n" +
       "出力は必ず次のJSON形式のみとし、前後に説明やMarkdownのコードフェンスを一切付けないでください。\n" +
       '{"corrections":[{"before":"修正前の文字列","after":"修正後の文字列","reason":"簡潔な理由"}]}\n' +
       "beforeは元の文章中に実際に存在する文字列を、置換できる十分な長さ（できれば文節〜短文単位）で抜き出してください。" +
@@ -182,6 +223,7 @@ export default async (request) => {
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
         max_tokens: 4000,
+        temperature: 0,
         system: systemPrompt,
         messages: [{ role: "user", content: target }],
       }),
@@ -220,12 +262,21 @@ export default async (request) => {
 
     // 金額表記は機械的に検出して確実に追加（LLMの見落としを防ぐ）。
     // 既にLLMが同じbeforeを挙げていれば重複させない。
-    const moneyIssues = detectMoneyIssues(target);
+    const { issues: moneyIssues, ranges: moneyRanges } = detectMoneyIssues(target);
     const existingBefores = new Set(corrections.map((c) => c && c.before));
     for (const mi of moneyIssues) {
       if (!existingBefores.has(mi.before)) {
         corrections.push(mi);
         existingBefores.add(mi.before);
+      }
+    }
+
+    // 半角数字を全角に統一（金額表現の範囲と重なる数字はスキップ）。
+    const digitIssues = detectFullwidthDigitIssues(target, moneyRanges);
+    for (const di of digitIssues) {
+      if (!existingBefores.has(di.before)) {
+        corrections.push(di);
+        existingBefores.add(di.before);
       }
     }
 
