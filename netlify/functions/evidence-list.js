@@ -48,8 +48,18 @@ export default async (request) => {
 "4. 立証趣旨は訴状の主張と証拠の対応関係から作成してよいが、事実を創作しないこと。\n" +
 "5. 標目・作成者等は実際の証拠物を見て確定すべきものであり、本下書きはあくまで仮であることを前提とする。\n\n" +
 "【重要】証拠として引用されていないものを創作してはならない。訴状に出てくる証拠だけを対象とする。\n\n" +
+"【事件情報の抽出】訴状の冒頭・末尾等から、次を抽出する：\n" +
+"・caseName … 事件名（事件番号を含む全体。例：『令和5年（ワ）第1326号　建物明渡請求事件』）。\n" +
+"・court … 裁判所名（提出先。例：『福岡地方裁判所第1民事部2係』。『御中』は付けない）。\n" +
+"・plaintiff … 原告名、defendant … 被告名。\n" +
+"・attorneys … 当方（" + side + "号証を提出する側。甲＝原告側、乙＝被告側）の訴訟代理人弁護士の氏名（複数可）。\n" +
+"いずれも見つからない項目は空にする。創作しない。\n\n" +
 "【出力形式】必ず次のJSONのみ。説明やコードフェンスは付けない。\n" +
-'{"evidences":[{"number":"' + side + '1","title":"","originalOrCopy":"写し","date":"","author":"","purpose":"","note":""}],"notes":["全体的な注意があれば"]}';
+'{"caseName":"事件名（事件番号含む。無ければ空）","court":"裁判所名（御中なし。無ければ空）",' +
+'"plaintiff":"原告名（無ければ空）","defendant":"被告名（無ければ空）",' +
+'"attorneys":["訴訟代理人弁護士の氏名（複数可。無ければ空配列）"],' +
+'"side":"' + side + '",' +
+'"evidences":[{"number":"' + side + '1","title":"","originalOrCopy":"写し","date":"","author":"","purpose":"","note":""}],"notes":["全体的な注意があれば"]}';
 
     const userContent =
 "次の訴状本文から、" + side + "号証の証拠説明書の下書きをJSONで作成してください。\n\n――― 訴状本文 ここから ―――\n" +
@@ -89,6 +99,11 @@ target + "\n――― 訴状本文 ここまで ―――";
 
     return new Response(
       JSON.stringify({
+        caseName: typeof parsed.caseName === "string" ? parsed.caseName : "",
+        court: typeof parsed.court === "string" ? parsed.court : "",
+        plaintiff: typeof parsed.plaintiff === "string" ? parsed.plaintiff : "",
+        defendant: typeof parsed.defendant === "string" ? parsed.defendant : "",
+        attorneys: Array.isArray(parsed.attorneys) ? parsed.attorneys : [],
         evidences: Array.isArray(parsed.evidences) ? parsed.evidences : [],
         notes: Array.isArray(parsed.notes) ? parsed.notes : [],
       }),
