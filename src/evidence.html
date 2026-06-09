@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>証拠説明書の作成</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fflate/0.8.2/umd/index.js"></script>
+  <style>
+    :root {
+      --ink: #1c2321; --paper: #f6f8f6; --accent: #2f6b4f;
+      --accent-soft: #d4e4da; --line: #cdd8d1; --warn: #b4452f;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Yu Gothic", "Hiragino Sans", sans-serif;
+      background: var(--paper); color: var(--ink);
+      padding: 18px 16px 30px; font-size: 13.5px; line-height: 1.7;
+    }
+    .masthead { border-bottom: 2px solid var(--ink); padding-bottom: 10px; }
+    .masthead h1 { font-size: 18px; letter-spacing: .08em; font-weight: 700; }
+    .masthead .sub {
+      font-size: 10px; letter-spacing: .22em; color: var(--accent);
+      text-transform: uppercase; margin-top: 3px;
+    }
+    .desc { font-size: 11.5px; color: #5a635e; margin: 14px 0 16px; }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 5px; }
+    select {
+      width: 100%; padding: 9px 10px; border: 1px solid var(--line);
+      border-radius: 6px; font-size: 13px; background: #fff;
+    }
+    button {
+      width: 100%; padding: 11px; border: none; border-radius: 6px;
+      background: var(--accent); color: #fff; font-size: 14px; font-weight: 600;
+      cursor: pointer; margin-top: 4px;
+    }
+    button:disabled { background: #9bb0a5; cursor: default; }
+    button.secondary { background: #fff; color: var(--accent); border: 1.5px solid var(--accent); }
+    .status { margin: 14px 0; font-size: 12px; padding: 9px 11px; border-radius: 6px; display: none; }
+    .status.show { display: block; }
+    .status.info { background: var(--accent-soft); color: #234; }
+    .status.ok { background: #e3f0e8; color: #1d4731; }
+    .status.err { background: #f5dcd5; color: #7a2e1c; }
+    .spinner {
+      display: inline-block; width: 12px; height: 12px; border: 2px solid #ffffff80;
+      border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite;
+      margin-right: 6px; vertical-align: -1px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .ev { border: 1px solid var(--line); border-radius: 7px; padding: 10px 11px; margin-bottom: 9px; background: #fff; }
+    .ev .num { font-weight: 700; color: var(--accent); font-size: 13px; }
+    .ev .title { font-weight: 600; margin: 2px 0; }
+    .ev .row { font-size: 11px; color: #5a635e; }
+    .ev .note { font-size: 10.5px; color: var(--warn); margin-top: 4px; }
+    .count { font-size: 11px; color: #5a635e; margin: 6px 0 10px; }
+    .refs { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); }
+    .refs-title { font-size: 10.5px; letter-spacing: .1em; color: var(--accent); margin-bottom: 5px; }
+    .note-box { background: #fbf3ef; border: 1px solid #e7cdc2; border-radius: 6px; padding: 9px 11px; font-size: 11px; color: #7a2e1c; margin: 12px 0; }
+  </style>
+</head>
+<body>
+  <div class="masthead">
+    <h1>証拠説明書の作成</h1>
+    <div class="sub">Evidence list generator</div>
+  </div>
+
+  <p class="desc">
+    訴状（このWord文書）を読み込み、引用されている証拠から証拠説明書の下書きを作成します。
+    内容を確認のうえ、ボタンでExcelをダウンロードしてください。
+  </p>
+
+  <div class="field">
+    <label for="side">証拠の区分</label>
+    <select id="side">
+      <option value="甲">甲号証（原告側）</option>
+      <option value="乙">乙号証（被告側）</option>
+    </select>
+  </div>
+
+  <button id="analyzeBtn">訴状を読み込んで証拠を抽出</button>
+
+  <div id="status" class="status"></div>
+  <div id="count" class="count"></div>
+  <div id="results"></div>
+
+  <button id="downloadBtn" class="secondary" style="display:none;">証拠説明書（Excel）をダウンロード</button>
+
+  <div class="note-box">
+    本ツールの出力は<strong>下書き</strong>です。標目・作成名義人・作成日・原本／写しの別は、
+    実際の証拠（甲号証・乙号証）を確認のうえ確定してください。「要確認」の注記がある項目は特にご注意ください。
+  </div>
+
+  <div class="refs">
+    <div class="refs-title">参考</div>
+    <div style="font-size:11px;color:#5a635e;">証拠説明書は、各書証の標目・作成者・立証趣旨等を記載する書面です。本ツールは訴状の引用から自動抽出した仮案です。</div>
+  </div>
+
+  <script src="evidence.js"></script>
+</body>
+</html>
