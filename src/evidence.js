@@ -116,6 +116,10 @@ function rowXml(rnum, vals) {
 function download() {
   try {
     var fflate = window.fflate;
+    if (!fflate || typeof fflate.unzipSync !== "function") {
+      setStatus("Excel生成に必要な部品の読み込みに失敗しました。ページを再読み込みして再度お試しください。", "err");
+      return;
+    }
     var zipObj = fflate.unzipSync(b64ToBytes(TEMPLATE_B64));
     var dec = new TextDecoder("utf-8");
     var xml = dec.decode(zipObj["xl/worksheets/sheet1.xml"]);
