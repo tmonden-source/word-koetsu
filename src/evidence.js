@@ -68,6 +68,7 @@ function callApi(text) {
         throw new Error("サーバーから想定外の応答が返りました（状態コード " + res.status + "）。少し待って再度お試しください。");
       }
       if (!res.ok) throw new Error(data.error || "サーバーエラー");
+      if (data.side === "甲" || data.side === "乙") lastSide = data.side; // 本文から判定された区分を優先
       lastEvidences = Array.isArray(data.evidences) ? data.evidences : [];
       lastHeader = {
         caseName: data.caseName || "",
