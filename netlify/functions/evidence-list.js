@@ -42,7 +42,11 @@ export default async (request) => {
 "   - originalOrCopy（原本／写し）：訴状から判断できなければ『写し』を仮置きする。\n" +
 "   - date（作成日）：文書の作成年月日。訴状に明示があれば記載、なければ空欄。\n" +
 "   - author（作成名義人）：その文書を作成した者（例：法務局、契約当事者双方、通知人 等）。\n" +
-"   - purpose（立証趣旨）：その証拠で何を立証しようとしているかを簡潔に記す。\n" +
+"   - purpose（立証趣旨）：その証拠で立証しようとする事実を簡潔に記す。" +
+"文末は必ず『〜事実。』の形で統一する（体言止め＋句点）。" +
+"例：『原告と訴外大橋弘寛が令和元年12月13日に婚姻した事実。』" +
+"『被告が令和4年3月頃から訴外弘寛と不貞行為に及んだ事実。』。" +
+"『〜を立証する』『〜したこと』などの語尾は使わず、必ず『〜事実。』で終える。\n" +
 "3. 訴状本文だけでは確定できない項目（標目の正確な名称、作成者、作成日、原本写しの別）は、" +
 "推定値を入れたうえで note に『要確認』と明記する。推測が全くできない項目は空文字にし note に理由を書く。\n" +
 "4. 立証趣旨は訴状の主張と証拠の対応関係から作成してよいが、事実を創作しないこと。\n" +
@@ -97,6 +101,29 @@ target + "\n――― 訴状本文 ここまで ―――";
       return new Response(JSON.stringify({ error: "解析結果の読み取りに失敗しました", raw }), { status: 502, headers: corsHeaders });
     }
 
+    // 立証趣旨の文末を「〜事実。」に統一する保険処理
+    function normalizePurpose(p) {
+      if (typeof p !== "string") return p;
+      var t = p.trim();
+      if (t === "") return t;
+      // 末尾の句点・空白を一旦除去
+      t = t.replace(/[。\.\s　]+$/, "");
+      // よくある語尾を「事実」に寄せる
+      t = t.replace(/ことを立証する$/, "事実");
+      t = t.replace(/を立証する$/, "事実");
+      t = t.replace(/を立証$/, "事実");
+      t = t.replace(/したこと$/, "した事実");
+      t = t.replace(/であること$/, "である事実");
+      t = t.replace(/こと$/, "事実");
+      // 既に「事実」で終わっていなければ「事実」を補う
+      if (!/事実$/.test(t)) t = t + "事実";
+      return t + "。";
+    }
+    var evList = Array.isArray(parsed.evidences) ? parsed.evidences : [];
+    evList.forEach(function (e) {
+      if (e && typeof e === "object") e.purpose = normalizePurpose(e.purpose);
+    });
+
     return new Response(
       JSON.stringify({
         caseName: typeof parsed.caseName === "string" ? parsed.caseName : "",
@@ -104,7 +131,7 @@ target + "\n――― 訴状本文 ここまで ―――";
         plaintiff: typeof parsed.plaintiff === "string" ? parsed.plaintiff : "",
         defendant: typeof parsed.defendant === "string" ? parsed.defendant : "",
         attorneys: Array.isArray(parsed.attorneys) ? parsed.attorneys : [],
-        evidences: Array.isArray(parsed.evidences) ? parsed.evidences : [],
+        evidences: evList,
         notes: Array.isArray(parsed.notes) ? parsed.notes : [],
       }),
       { status: 200, headers: corsHeaders }
