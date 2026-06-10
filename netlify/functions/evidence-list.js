@@ -78,7 +78,7 @@ target + "\n――― 訴状本文 ここまで ―――";
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 6000,
+        max_tokens: 4000,
         temperature: 0,
         system: systemPrompt,
         messages: [{ role: "user", content: userContent }],

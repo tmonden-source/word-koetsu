@@ -56,7 +56,17 @@ function callApi(text) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ complaint: text, side: lastSide }),
   }).then(function (res) {
-    return res.json().then(function (data) {
+    return res.text().then(function (bodyText) {
+      var data;
+      try {
+        data = JSON.parse(bodyText);
+      } catch (e) {
+        // JSONでない（HTMLのエラー画面等）。多くは処理時間切れ。
+        if (res.status === 502 || res.status === 504) {
+          throw new Error("処理に時間がかかりすぎたため中断されました。訴状が長い場合に起こることがあります。少し時間をおいて再度お試しください。");
+        }
+        throw new Error("サーバーから想定外の応答が返りました（状態コード " + res.status + "）。少し待って再度お試しください。");
+      }
       if (!res.ok) throw new Error(data.error || "サーバーエラー");
       lastEvidences = Array.isArray(data.evidences) ? data.evidences : [];
       lastHeader = {
