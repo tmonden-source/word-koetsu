@@ -9,8 +9,3 @@
 [functions]
   # Node.js のランタイムを ES Module として扱う
   node_bundler = "esbuild"
-
-# 証拠抽出は処理が長いため、関数のタイムアウトを延長する（既定10秒→26秒）
-[functions."evidence-list"]
-  # 同期関数の最大値（秒）。長い訴状の解析でも途中で打ち切られないようにする
-  timeout = 26

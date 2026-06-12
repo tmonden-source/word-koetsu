@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>委任契約書の作成</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <style>
+    :root{--ink:#1c2321;--paper:#f6f8f6;--accent:#2f6b4f;--accent-soft:#d4e4da;--line:#cdd8d1;--warn:#b4452f;}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:"Yu Gothic","Hiragino Sans",sans-serif;background:var(--paper);color:var(--ink);padding:16px 14px 30px;font-size:13px;line-height:1.6;}
+    .masthead{border-bottom:2px solid var(--ink);padding-bottom:9px;margin-bottom:12px;}
+    .masthead h1{font-size:17px;letter-spacing:.06em;}
+    .masthead .sub{font-size:9.5px;letter-spacing:.2em;color:var(--accent);text-transform:uppercase;margin-top:2px;}
+    .sec{margin:14px 0 6px;font-weight:700;font-size:12.5px;color:var(--accent);border-left:3px solid var(--accent);padding-left:7px;}
+    .field{margin-bottom:9px;}
+    .field label{display:block;font-size:11.5px;font-weight:600;margin-bottom:3px;}
+    input[type=text],input[type=number],select{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:5px;font-size:13px;background:#fff;}
+    .row2{display:flex;gap:8px;}
+    .row2>div{flex:1;}
+    .hint{font-size:10px;color:#7a857d;margin-top:2px;}
+    .calc{background:var(--accent-soft);border-radius:6px;padding:8px 10px;margin:8px 0;font-size:12px;}
+    .calc b{color:var(--accent);}
+    button{width:100%;padding:11px;border:none;border-radius:6px;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-top:10px;}
+    button:disabled{background:#9bb0a5;}
+    .status{margin:12px 0;font-size:12px;padding:9px 11px;border-radius:6px;display:none;}
+    .status.show{display:block;}
+    .status.ok{background:#e3f0e8;color:#1d4731;}
+    .status.err{background:#f5dcd5;color:#7a2e1c;}
+    .status.info{background:var(--accent-soft);color:#234;}
+    .split-only,.lump-only{display:none;}
+    .radio-group{display:flex;gap:14px;margin-top:3px;}
+    .radio-group label{font-weight:400;font-size:12.5px;display:flex;align-items:center;gap:4px;}
+    hr{border:none;border-top:1px solid var(--line);margin:14px 0;}
+  </style>
+</head>
+<body>
+  <div class="masthead">
+    <h1>委任契約書の作成</h1>
+    <div class="sub">Engagement letter filler</div>
+  </div>
+
+  <div class="status info show" style="font-size:11px;">
+    ※ このひな形が古い形式（.doc）の場合は、先に「名前を付けて保存」で .docx 形式にしてから開いてください。
+  </div>
+
+  <div class="sec">１．費用</div>
+  <div class="field"><label>法人破産の費用（税込・円）</label><input type="number" id="fee" placeholder="例: 600000" /></div>
+  <div class="field"><label>事務手数料（税込・円）</label><input type="number" id="admin" placeholder="例: 50000" /></div>
+  <div class="field"><label>預り金（円）</label><input type="number" id="deposit" placeholder="例: 200000" /></div>
+  <div class="calc" id="calcBox">合計：<b id="sumView">—</b>　／　うち預り金：<b id="depView">—</b></div>
+
+  <div class="sec">２．支払方法</div>
+  <div class="field">
+    <div class="radio-group">
+      <label><input type="radio" name="pay" value="一括" /> 一括払い</label>
+      <label><input type="radio" name="pay" value="分割" checked /> 分割払い</label>
+    </div>
+  </div>
+
+  <div class="lump-only" id="lumpFields">
+    <div class="field"><label>支払期日</label>
+      <div class="row2">
+        <div><input type="number" id="lumpY" placeholder="令和?年" /></div>
+        <div><input type="number" id="lumpM" placeholder="月" /></div>
+        <div><input type="number" id="lumpD" placeholder="日" /></div>
+      </div>
+      <div class="hint">空欄なら契約書の日付欄は「令和〇年〇月〇日」のままになります</div>
+    </div>
+  </div>
+
+  <div class="split-only" id="splitFields">
+    <div class="field"><label>初回一括額（任意・円）</label><input type="number" id="firstLump" placeholder="特定月にまとめて払う額。無ければ空欄" />
+      <div class="hint">入力すると、合計からこの額を引いた残りを月割りします</div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>分割回数</label><input type="number" id="months" placeholder="例: 10" /></div>
+      <div class="field"><label>初回支払月（令和?年?月）</label>
+        <div class="row2"><div><input type="number" id="startY" placeholder="年" /></div><div><input type="number" id="startM" placeholder="月" /></div></div>
+      </div>
+    </div>
+    <div class="field"><label>金額の丸め</label>
+      <select id="round"><option value="1">1円単位（端数は最終回）</option><option value="1000">1000円単位（端数は最終回）</option></select>
+    </div>
+    <div class="calc" id="splitPreview">分割内訳：入力すると表示されます</div>
+  </div>
+
+  <hr/>
+  <div class="sec">３．署名欄（甲）</div>
+  <div class="field"><label>ご住所</label><input type="text" id="addr" placeholder="例: 福岡市中央区天神1-1-1" /></div>
+  <div class="field"><label>会社名等</label><input type="text" id="company" placeholder="例: 株式会社サンプル" /></div>
+  <div class="field"><label>代表者氏名</label><input type="text" id="rep" placeholder="例: 山田太郎" /></div>
+  <div class="hint">お名前欄は「会社名　代表者氏名」の形で記載されます</div>
+
+  <button id="applyBtn">契約書に反映</button>
+  <div id="status" class="status"></div>
+
+  <script src="contract.js"></script>
+</body>
+</html>

@@ -16,5 +16,8 @@
     "proofreading",
     "japanese"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
 }
